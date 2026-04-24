@@ -396,6 +396,7 @@ func buildSchedulerMetadataAccount(account service.Account) service.Account {
 		SessionWindowStatus:     account.SessionWindowStatus,
 		Credentials:             filterSchedulerCredentials(account.Credentials),
 		Extra:                   filterSchedulerExtra(account.Extra),
+		GroupIDs:                account.GroupIDs,
 	}
 }
 

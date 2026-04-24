@@ -31,3 +31,16 @@ func TestBuildSchedulerMetadataAccount_KeepsOpenAIWSFlags(t *testing.T) {
 	require.Equal(t, true, got.Extra["mixed_scheduling"])
 	require.Nil(t, got.Extra["unused_large_field"])
 }
+
+func TestBuildSchedulerMetadataAccount_KeepsGroupIDs(t *testing.T) {
+	account := service.Account{
+		ID:       99,
+		Platform: service.PlatformAnthropic,
+		Type:     service.AccountTypeOAuth,
+		GroupIDs: []int64{3, 7},
+	}
+
+	got := buildSchedulerMetadataAccount(account)
+
+	require.Equal(t, []int64{3, 7}, got.GroupIDs)
+}

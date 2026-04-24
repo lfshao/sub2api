@@ -63,6 +63,16 @@ func TestIsAccountInGroup(t *testing.T) {
 			&groupID100, false,
 		},
 		{
+			"with_groupID_falls_back_to_group_ids",
+			&Account{ID: 71, GroupIDs: []int64{100}},
+			&groupID100, true,
+		},
+		{
+			"with_groupID_group_ids_no_match",
+			&Account{ID: 72, GroupIDs: []int64{200}},
+			&groupID100, false,
+		},
+		{
 			"with_groupID_multi_group_account_match_one",
 			&Account{ID: 8, AccountGroups: []AccountGroup{{GroupID: 100}, {GroupID: 200}}},
 			&groupID200, true,
@@ -76,6 +86,11 @@ func TestIsAccountInGroup(t *testing.T) {
 		{
 			"nil_account_nil_groupID",
 			nil,
+			nil, false,
+		},
+		{
+			"nil_groupID_group_ids_present",
+			&Account{ID: 73, GroupIDs: []int64{100}},
 			nil, false,
 		},
 		{
