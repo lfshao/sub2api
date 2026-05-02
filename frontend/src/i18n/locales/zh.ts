@@ -3096,6 +3096,16 @@ export default {
       quotaControl: {
         title: '配额控制',
         hint: '配置费用窗口、会话限制、客户端亲和等调度控制。',
+        claudeCLIProxy: {
+          label: 'Claude CLI 代理',
+          hint: '启用后通过本机 claude 命令转发请求',
+          command: 'CLI 命令',
+          commandPlaceholder: '默认: claude',
+          webToolsForwardGroup: 'WebSearch 转发分组',
+          currentRoute: '未选择账号组',
+          userID: '稳定 UserID',
+          userIDPlaceholder: '留空自动生成'
+        },
         windowCost: {
           label: '5h窗口费用控制',
           hint: '限制账号在5小时窗口内的费用使用',

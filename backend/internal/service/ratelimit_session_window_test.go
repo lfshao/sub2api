@@ -17,6 +17,7 @@ type sessionWindowMockRepo struct {
 	sessionWindowCalls []swCall
 	updateExtraCalls   []ueCall
 	clearRateLimitIDs  []int64
+	rateLimitCalls     []rateLimitCall
 }
 
 var _ AccountRepository = (*sessionWindowMockRepo)(nil)
@@ -31,6 +32,11 @@ type swCall struct {
 type ueCall struct {
 	ID      int64
 	Updates map[string]any
+}
+
+type rateLimitCall struct {
+	ID      int64
+	ResetAt time.Time
 }
 
 func (m *sessionWindowMockRepo) UpdateSessionWindow(_ context.Context, id int64, start, end *time.Time, status string) error {
@@ -134,8 +140,9 @@ func (m *sessionWindowMockRepo) ListSchedulableUngroupedByPlatform(context.Conte
 func (m *sessionWindowMockRepo) ListSchedulableUngroupedByPlatforms(context.Context, []string) ([]Account, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) SetRateLimited(context.Context, int64, time.Time) error {
-	panic("unexpected")
+func (m *sessionWindowMockRepo) SetRateLimited(_ context.Context, id int64, resetAt time.Time) error {
+	m.rateLimitCalls = append(m.rateLimitCalls, rateLimitCall{ID: id, ResetAt: resetAt})
+	return nil
 }
 func (m *sessionWindowMockRepo) SetModelRateLimit(context.Context, int64, string, time.Time) error {
 	panic("unexpected")
