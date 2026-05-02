@@ -499,6 +499,8 @@ type ForwardResult struct {
 	FirstTokenMs     *int // 首字时间（流式请求）
 	ClientDisconnect bool // 客户端是否在流式传输过程中断开
 	ReasoningEffort  *string
+	RateLimitResetAt *time.Time
+	ClaudeCLIUserID  string
 
 	// 图片生成计费字段（图片生成模型使用）
 	ImageCount int    // 生成的图片数量
@@ -570,6 +572,7 @@ type GatewayService struct {
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
+	claudeCLIProxy        claudeCLIForwarder
 }
 
 // NewGatewayService creates a new GatewayService
@@ -635,6 +638,7 @@ func NewGatewayService(
 		channelService:       channelService,
 		resolver:             resolver,
 		balanceNotifyService: balanceNotifyService,
+		claudeCLIProxy:       NewClaudeCLIProxy(),
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -4324,6 +4328,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		return s.handleWebSearchEmulation(ctx, c, account, parsed)
 	}
 
+	if account != nil && account.IsClaudeCLIProxyEnabled() && isOnlyWebSearchToolInBody(parsed.Body) {
+		return s.forwardClaudeCLIWebToolsRequest(ctx, c, account, parsed, startTime)
+	}
+
 	if account != nil && account.IsAnthropicAPIKeyPassthroughEnabled() {
 		passthroughBody := parsed.Body
 		passthroughModel := parsed.Model
@@ -4341,6 +4349,18 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			RequestStream: parsed.Stream,
 			StartTime:     startTime,
 		})
+	}
+
+	if account != nil && account.IsClaudeCLIProxyEnabled() {
+		if s.claudeCLIProxy == nil {
+			return nil, fmt.Errorf("claude cli proxy: not configured")
+		}
+		result, err := s.claudeCLIProxy.Forward(ctx, c, account, parsed, startTime)
+		s.persistClaudeCLIUserIDFromResult(ctx, account, result)
+		if err == nil && result != nil && result.RateLimitResetAt != nil && s.rateLimitService != nil {
+			s.rateLimitService.HandleClaudeCLIRateLimit(ctx, account, *result.RateLimitResetAt)
+		}
+		return result, err
 	}
 
 	if account != nil && account.IsBedrock() {
