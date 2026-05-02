@@ -2955,6 +2955,16 @@ export default {
       quotaControl: {
         title: 'Quota Control',
         hint: 'Configure cost window, session limits, client affinity and other scheduling controls.',
+        claudeCLIProxy: {
+          label: 'Claude CLI Proxy',
+          hint: 'Forward requests through the local claude command',
+          command: 'CLI Command',
+          commandPlaceholder: 'Default: claude',
+          webToolsForwardGroup: 'WebSearch Forward Group',
+          currentRoute: 'No account group selected',
+          userID: 'Stable UserID',
+          userIDPlaceholder: 'Leave empty to auto-generate'
+        },
         windowCost: {
           label: '5h Window Cost Limit',
           hint: 'Limit account cost usage within the 5-hour window',

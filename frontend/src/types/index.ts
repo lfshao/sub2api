@@ -837,6 +837,12 @@ export interface Account {
   custom_base_url_enabled?: boolean | null
   custom_base_url?: string | null
 
+  // Claude CLI 代理（仅 Anthropic OAuth/SetupToken 账号有效）
+  claude_cli_proxy_enabled?: boolean | null
+  claude_cli_command?: string | null
+  claude_cli_web_tools_forward_group_id?: number | null
+  claude_cli_userID?: string | null
+
   // API Key 账号配额限制
   quota_limit?: number | null
   quota_used?: number | null
