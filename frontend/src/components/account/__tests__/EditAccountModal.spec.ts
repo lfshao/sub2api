@@ -216,4 +216,47 @@ describe('EditAccountModal', () => {
       'gpt-5.4': 'gpt-5.4-openai-compact'
     })
   })
+
+  it('submits Anthropic OAuth CLI proxy settings and clears hidden direct-forwarding fields', async () => {
+    const account = {
+      ...buildAccount(),
+      name: 'Claude OAuth',
+      platform: 'anthropic',
+      type: 'oauth',
+      credentials: {
+        access_token: 'tok'
+      },
+      extra: {
+        claude_cli_proxy_enabled: true,
+        claude_cli_command: 'claude',
+        claude_cli_web_tools_forward_group_id: 8,
+        claude_cli_userID: 'abc',
+        enable_tls_fingerprint: true,
+        tls_fingerprint_profile_id: 2,
+        session_id_masking_enabled: true,
+        cache_ttl_override_enabled: true,
+        cache_ttl_override_target: '1h'
+      }
+    } as any
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    expect(extra.claude_cli_proxy_enabled).toBe(true)
+    expect(extra.claude_cli_command).toBe('claude')
+    expect(extra.claude_cli_web_tools_forward_group_id).toBe(8)
+    expect(extra.claude_cli_userID).toBe('abc')
+    expect(extra.enable_tls_fingerprint).toBeUndefined()
+    expect(extra.tls_fingerprint_profile_id).toBeUndefined()
+    expect(extra.session_id_masking_enabled).toBeUndefined()
+    expect(extra.cache_ttl_override_enabled).toBeUndefined()
+    expect(extra.cache_ttl_override_target).toBeUndefined()
+  })
 })

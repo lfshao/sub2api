@@ -1633,7 +1633,9 @@ func detectInterceptType(body []byte, model string, maxTokens int, isStream bool
 		}
 		// 检查 system 中的标题提取模式
 		for _, sys := range req.System {
-			if strings.Contains(sys.Text, "nalyze if this message indicates a new conversation topic. If it does, extract a 2-3 word title") {
+			if strings.Contains(sys.Text, "nalyze if this message indicates a new conversation topic. If it does, extract a 2-3 word title") ||
+				(strings.Contains(sys.Text, "Generate a concise, sentence-case title") &&
+					strings.Contains(sys.Text, `single "title" field`)) {
 				return InterceptTypeWarmup
 			}
 		}

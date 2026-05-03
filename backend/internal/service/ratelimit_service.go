@@ -929,6 +929,26 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	slog.Info("account_rate_limited", "account_id", account.ID, "reset_at", resetAt)
 }
 
+func (s *RateLimitService) HandleClaudeCLIRateLimit(ctx context.Context, account *Account, resetAt time.Time) {
+	if s == nil || s.accountRepo == nil || account == nil || resetAt.IsZero() {
+		return
+	}
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
+		slog.Warn("claude_cli_rate_limit_set_failed", "account_id", account.ID, "error", err)
+		return
+	}
+
+	if account.Platform == PlatformAnthropic {
+		windowEnd := resetAt
+		windowStart := windowEnd.Add(-5 * time.Hour)
+		if err := s.accountRepo.UpdateSessionWindow(ctx, account.ID, &windowStart, &windowEnd, "rejected"); err != nil {
+			slog.Warn("claude_cli_rate_limit_update_session_window_failed", "account_id", account.ID, "error", err)
+		}
+	}
+
+	slog.Info("claude_cli_account_rate_limited", "account_id", account.ID, "reset_at", resetAt, "reset_in", time.Until(resetAt).Truncate(time.Second))
+}
+
 // calculateOpenAI429ResetTime 从 OpenAI 429 响应头计算正确的重置时间
 // 返回 nil 表示无法从响应头中确定重置时间
 func calculateOpenAI429ResetTime(headers http.Header) *time.Time {

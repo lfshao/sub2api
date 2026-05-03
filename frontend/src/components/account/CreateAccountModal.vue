@@ -2070,6 +2070,63 @@
           </p>
         </div>
 
+        <!-- Claude CLI Proxy -->
+        <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="input-label mb-0">{{ t('admin.accounts.quotaControl.claudeCLIProxy.label') }}</label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.quotaControl.claudeCLIProxy.hint') }}
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="claudeCLIProxyEnabled = !claudeCLIProxyEnabled"
+              :class="[
+                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                claudeCLIProxyEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+              ]"
+            >
+              <span
+                :class="[
+                  'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  claudeCLIProxyEnabled ? 'translate-x-5' : 'translate-x-0'
+                ]"
+              />
+            </button>
+          </div>
+
+          <div v-if="showClaudeCLIOptions" class="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="input-label">{{ t('admin.accounts.quotaControl.claudeCLIProxy.command') }}</label>
+              <input
+                v-model="claudeCLICommand"
+                type="text"
+                class="input"
+                :placeholder="t('admin.accounts.quotaControl.claudeCLIProxy.commandPlaceholder')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.quotaControl.claudeCLIProxy.webToolsForwardGroup') }}</label>
+              <select v-model.number="claudeCLIWebToolsForwardGroupId" class="input">
+                <option :value="null">{{ t('admin.accounts.quotaControl.claudeCLIProxy.currentRoute') }}</option>
+                <option v-for="group in anthropicGroups" :key="group.id" :value="group.id">
+                  {{ group.name }} (#{{ group.id }})
+                </option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="input-label">{{ t('admin.accounts.quotaControl.claudeCLIProxy.userID') }}</label>
+              <input
+                v-model="claudeCLIUserID"
+                type="text"
+                class="input font-mono"
+                :placeholder="t('admin.accounts.quotaControl.claudeCLIProxy.userIDPlaceholder')"
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- Window Cost Limit -->
         <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
@@ -2301,7 +2358,7 @@
         </div>
 
         <!-- TLS Fingerprint -->
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+        <div v-if="showDirectForwardingOptions" class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
           <div class="flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.quotaControl.tlsFingerprint.label') }}</label>
@@ -2336,7 +2393,7 @@
         </div>
 
         <!-- Session ID Masking -->
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+        <div v-if="showDirectForwardingOptions" class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
           <div class="flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.quotaControl.sessionIdMasking.label') }}</label>
@@ -2363,7 +2420,7 @@
         </div>
 
         <!-- Cache TTL Override -->
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+        <div v-if="showDirectForwardingOptions" class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
           <div class="flex items-center justify-between">
             <div>
               <label class="input-label mb-0">{{ t('admin.accounts.quotaControl.cacheTTLOverride.label') }}</label>
@@ -3129,7 +3186,12 @@ import ProxySelector from '@/components/common/ProxySelector.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
-import { applyInterceptWarmup } from '@/components/account/credentialsBuilder'
+import {
+  applyCLIHiddenForwardingExtra,
+  applyClaudeCLIProxyExtra,
+  applyCustomBaseUrlExtra,
+  applyInterceptWarmup
+} from '@/components/account/credentialsBuilder'
 import { formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
@@ -3378,6 +3440,15 @@ const cacheTTLOverrideEnabled = ref(false)
 const cacheTTLOverrideTarget = ref<string>('5m')
 const customBaseUrlEnabled = ref(false)
 const customBaseUrl = ref('')
+const claudeCLIProxyEnabled = ref(false)
+const claudeCLICommand = ref('')
+const claudeCLIWebToolsForwardGroupId = ref<number | null>(null)
+const claudeCLIUserID = ref('')
+const anthropicGroups = computed(() => props.groups.filter(group => group.platform === 'anthropic'))
+const showClaudeCLIOptions = computed(() =>
+  form.platform === 'anthropic' && accountCategory.value === 'oauth-based' && claudeCLIProxyEnabled.value
+)
+const showDirectForwardingOptions = computed(() => !showClaudeCLIOptions.value)
 
 // Gemini tier selection (used as fallback when auto-detection is unavailable/fails)
 const geminiTierGoogleOne = ref<'google_one_free' | 'google_ai_pro' | 'google_ai_ultra'>('google_one_free')
@@ -4062,6 +4133,10 @@ const resetForm = () => {
   cacheTTLOverrideTarget.value = '5m'
   customBaseUrlEnabled.value = false
   customBaseUrl.value = ''
+  claudeCLIProxyEnabled.value = false
+  claudeCLICommand.value = ''
+  claudeCLIWebToolsForwardGroupId.value = null
+  claudeCLIUserID.value = ''
   allowOverages.value = false
   antigravityAccountType.value = 'oauth'
   upstreamBaseUrl.value = ''
@@ -4977,30 +5052,37 @@ const handleAnthropicExchange = async (authCode: string) => {
       extra.user_msg_queue_mode = userMsgQueueMode.value
     }
 
-    // Add TLS fingerprint settings
-    if (tlsFingerprintEnabled.value) {
+    // Add direct HTTP forwarding settings
+    if (showDirectForwardingOptions.value && tlsFingerprintEnabled.value) {
       extra.enable_tls_fingerprint = true
       if (tlsFingerprintProfileId.value) {
         extra.tls_fingerprint_profile_id = tlsFingerprintProfileId.value
       }
     }
 
-    // Add session ID masking settings
-    if (sessionIdMaskingEnabled.value) {
+    if (showDirectForwardingOptions.value && sessionIdMaskingEnabled.value) {
       extra.session_id_masking_enabled = true
     }
 
-    // Add cache TTL override settings
-    if (cacheTTLOverrideEnabled.value) {
+    if (showDirectForwardingOptions.value && cacheTTLOverrideEnabled.value) {
       extra.cache_ttl_override_enabled = true
       extra.cache_ttl_override_target = cacheTTLOverrideTarget.value
     }
+    applyCLIHiddenForwardingExtra(extra, claudeCLIProxyEnabled.value, 'create')
 
-    // Add custom base URL settings
-    if (customBaseUrlEnabled.value && customBaseUrl.value.trim()) {
-      extra.custom_base_url_enabled = true
-      extra.custom_base_url = customBaseUrl.value.trim()
-    }
+    applyCustomBaseUrlExtra(
+      extra,
+      customBaseUrlEnabled.value,
+      customBaseUrl.value,
+      'create',
+      claudeCLIProxyEnabled.value
+    )
+    applyClaudeCLIProxyExtra(extra, {
+      enabled: claudeCLIProxyEnabled.value,
+      command: claudeCLICommand.value,
+      webToolsForwardGroupId: claudeCLIWebToolsForwardGroupId.value,
+      userID: claudeCLIUserID.value
+    }, 'create')
 
     const credentials: Record<string, unknown> = { ...tokenInfo }
     applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
@@ -5100,30 +5182,37 @@ const handleCookieAuth = async (sessionKey: string) => {
           extra.user_msg_queue_mode = userMsgQueueMode.value
         }
 
-        // Add TLS fingerprint settings
-        if (tlsFingerprintEnabled.value) {
+        // Add direct HTTP forwarding settings
+        if (showDirectForwardingOptions.value && tlsFingerprintEnabled.value) {
           extra.enable_tls_fingerprint = true
           if (tlsFingerprintProfileId.value) {
             extra.tls_fingerprint_profile_id = tlsFingerprintProfileId.value
           }
         }
 
-        // Add session ID masking settings
-        if (sessionIdMaskingEnabled.value) {
+        if (showDirectForwardingOptions.value && sessionIdMaskingEnabled.value) {
           extra.session_id_masking_enabled = true
         }
 
-        // Add cache TTL override settings
-        if (cacheTTLOverrideEnabled.value) {
+        if (showDirectForwardingOptions.value && cacheTTLOverrideEnabled.value) {
           extra.cache_ttl_override_enabled = true
           extra.cache_ttl_override_target = cacheTTLOverrideTarget.value
         }
+        applyCLIHiddenForwardingExtra(extra, claudeCLIProxyEnabled.value, 'create')
 
-        // Add custom base URL settings
-        if (customBaseUrlEnabled.value && customBaseUrl.value.trim()) {
-          extra.custom_base_url_enabled = true
-          extra.custom_base_url = customBaseUrl.value.trim()
-        }
+        applyCustomBaseUrlExtra(
+          extra,
+          customBaseUrlEnabled.value,
+          customBaseUrl.value,
+          'create',
+          claudeCLIProxyEnabled.value
+        )
+        applyClaudeCLIProxyExtra(extra, {
+          enabled: claudeCLIProxyEnabled.value,
+          command: claudeCLICommand.value,
+          webToolsForwardGroupId: claudeCLIWebToolsForwardGroupId.value,
+          userID: claudeCLIUserID.value
+        }, 'create')
 
         const accountName = keys.length > 1 ? `${form.name} #${i + 1}` : form.name
 
