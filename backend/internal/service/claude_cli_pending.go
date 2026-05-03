@@ -231,12 +231,14 @@ func (p *ClaudeCLIProxy) forwardPendingToolResults(ctx context.Context, c *gin.C
 				continue
 			}
 			p.registerPendingToolCalls(pending, calls, claudeCLIPendingToolRunHoldTTL(account))
+			usage := pending.stdoutCollector.Usage()
 			prefixBlocks := claudeCLIToolUsePrefixBlocks(ctx, pending.stdoutCollector, calls)
-			if err := writeClaudeCLIToolUseResponse(c, input, parsed, calls, prefixBlocks); err != nil {
+			if err := writeClaudeCLIToolUseResponse(c, input, parsed, calls, prefixBlocks, usage); err != nil {
 				p.closePendingToolRun(pending, true)
 				return nil, err
 			}
 			return &ForwardResult{
+				Usage:         usage,
 				Model:         parsed.Model,
 				UpstreamModel: pending.inputModel,
 				Stream:        parsed.Stream,

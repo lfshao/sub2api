@@ -368,12 +368,14 @@ func (p *ClaudeCLIProxy) forwardWithClientTools(ctx context.Context, c *gin.Cont
 		if parsed != nil && parsed.OnUpstreamAccepted != nil {
 			parsed.OnUpstreamAccepted()
 		}
+		usage := stdoutCollector.Usage()
 		prefixBlocks := claudeCLIToolUsePrefixBlocks(ctx, stdoutCollector, calls)
-		if err := writeClaudeCLIToolUseResponse(c, input, parsed, calls, prefixBlocks); err != nil {
+		if err := writeClaudeCLIToolUseResponse(c, input, parsed, calls, prefixBlocks, usage); err != nil {
 			p.closePendingToolRun(pending, true)
 			return nil, err
 		}
 		return &ForwardResult{
+			Usage:           usage,
 			Model:           parsed.Model,
 			UpstreamModel:   input.Model,
 			Stream:          parsed.Stream,
@@ -531,16 +533,28 @@ func claudeCLIAccountProxyURL(account *Account) string {
 	return account.Proxy.URL()
 }
 
-func writeClaudeCLIToolUseResponse(c *gin.Context, input *claudeCLIInput, parsed *ParsedRequest, calls []claudeCLIToolCall, prefixBlocks []map[string]any) error {
+func writeClaudeCLIToolUseResponse(c *gin.Context, input *claudeCLIInput, parsed *ParsedRequest, calls []claudeCLIToolCall, prefixBlocks []map[string]any, usage ClaudeUsage) error {
 	if len(calls) == 0 {
 		return nil
 	}
+	responseUsage := claudeCLIResponseUsage(usage)
 	if parsed != nil && parsed.Stream {
+		startUsage := usage
+		startUsage.OutputTokens = 0
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Status(http.StatusOK)
 		events := []json.RawMessage{
-			json.RawMessage(fmt.Sprintf(`{"type":"message_start","message":{"id":"msg_%s","role":"assistant","model":%q,"content":[],"usage":{"input_tokens":0,"output_tokens":0}}}`, calls[0].ID, input.Model)),
+			mustClaudeCLIRawJSON(map[string]any{
+				"type": "message_start",
+				"message": map[string]any{
+					"id":      "msg_" + calls[0].ID,
+					"role":    "assistant",
+					"model":   input.Model,
+					"content": []any{},
+					"usage":   claudeCLIResponseUsage(startUsage),
+				},
+			}),
 		}
 		visibleIndex := 0
 		for _, block := range prefixBlocks {
@@ -563,7 +577,7 @@ func writeClaudeCLIToolUseResponse(c *gin.Context, input *claudeCLIInput, parsed
 			visibleIndex++
 		}
 		events = append(events,
-			json.RawMessage(`{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":0}}`),
+			mustClaudeCLIRawJSON(map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": "tool_use"}, "usage": map[string]any{"output_tokens": usage.OutputTokens}}),
 			json.RawMessage(`{"type":"message_stop"}`),
 		)
 		for _, event := range events {
@@ -606,7 +620,7 @@ func writeClaudeCLIToolUseResponse(c *gin.Context, input *claudeCLIInput, parsed
 		"content":       content,
 		"stop_reason":   "tool_use",
 		"stop_sequence": nil,
-		"usage":         claudeCLIResponseUsage(ClaudeUsage{}),
+		"usage":         responseUsage,
 	}
 	return json.NewEncoder(c.Writer).Encode(message)
 }

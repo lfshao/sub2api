@@ -23,6 +23,7 @@ type claudeCLIOutputCollector struct {
 	blocksByIndex    map[int]map[string]any
 	inputJSONByIndex map[int]string
 	prefixByToolUse  map[string][]map[string]any
+	usage            ClaudeUsage
 }
 
 func newClaudeCLIOutputCollector() *claudeCLIOutputCollector {
@@ -55,6 +56,15 @@ func (c *claudeCLIOutputCollector) Bytes() []byte {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]byte(nil), c.data.Bytes()...)
+}
+
+func (c *claudeCLIOutputCollector) Usage() ClaudeUsage {
+	if c == nil {
+		return ClaudeUsage{}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.usage
 }
 
 func (c *claudeCLIOutputCollector) WaitToolUsePrefix(ctx context.Context, toolUseID string, timeout time.Duration) []map[string]any {
@@ -122,6 +132,7 @@ func (c *claudeCLIOutputCollector) observeLine(line []byte) {
 	case "message_start":
 		c.blocksByIndex = make(map[int]map[string]any)
 		c.inputJSONByIndex = make(map[int]string)
+		mergeClaudeCLIUsage(&c.usage, event.Message.Usage, true)
 	case "content_block_start":
 		if len(event.ContentBlock) == 0 {
 			return
@@ -164,6 +175,8 @@ func (c *claudeCLIOutputCollector) observeLine(line []byte) {
 		if block := c.blocksByIndex[event.Index]; block != nil {
 			block["input"] = input
 		}
+	case "message_delta":
+		mergeClaudeCLIUsage(&c.usage, event.Usage, false)
 	}
 }
 

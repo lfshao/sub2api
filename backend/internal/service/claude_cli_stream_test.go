@@ -364,6 +364,32 @@ func TestTranslateClaudeCLIStreamUsageDoesNotLeakInternalFields(t *testing.T) {
 	require.Equal(t, float64(3), cacheCreation["ephemeral_1h_input_tokens"])
 }
 
+func TestClaudeCLIOutputCollectorTracksUsageBeforeToolResult(t *testing.T) {
+	collector := newClaudeCLIOutputCollector()
+	lines := []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_1","role":"assistant","model":"claude-opus-4-7","content":[],"usage":{"input_tokens":11,"cache_creation_input_tokens":5,"cache_read_input_tokens":7,"cache_creation":{"ephemeral_5m_input_tokens":2,"ephemeral_1h_input_tokens":3}}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Need a tool."}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"mcp__claude__Bash","input":{}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"date\"}"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop","index":1}}`,
+		`{"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":9}}}`,
+	}
+	for _, line := range lines {
+		collector.appendLine([]byte(line))
+		collector.observeLine([]byte(line))
+	}
+
+	usage := collector.Usage()
+	require.Equal(t, 11, usage.InputTokens)
+	require.Equal(t, 9, usage.OutputTokens)
+	require.Equal(t, 5, usage.CacheCreationInputTokens)
+	require.Equal(t, 7, usage.CacheReadInputTokens)
+	require.Equal(t, 2, usage.CacheCreation5mTokens)
+	require.Equal(t, 3, usage.CacheCreation1hTokens)
+}
+
 func TestFilterClaudeCLIOutputForCompletedToolUsesDropsNonMCPToolUseMessages(t *testing.T) {
 	input := claudeCLIStreamJSON(
 		`{"type":"message_start","message":{"id":"msg_bad","role":"assistant","model":"claude-opus-4-7","content":[],"usage":{"input_tokens":1}}}`,

@@ -1263,6 +1263,7 @@ func TestWriteClaudeCLIToolUseResponseIncludesThinkingInStream(t *testing.T) {
 		&ParsedRequest{Stream: true},
 		[]claudeCLIToolCall{{ID: "toolu_1", Name: "lookup", Input: map[string]any{"q": "hello"}}},
 		[]map[string]any{{"type": "thinking", "thinking": "Need lookup.", "signature": "sig_1"}},
+		ClaudeUsage{},
 	)
 	require.NoError(t, err)
 	body := rec.Body.String()
@@ -1272,6 +1273,29 @@ func TestWriteClaudeCLIToolUseResponseIncludesThinkingInStream(t *testing.T) {
 	require.Contains(t, body, `"index":1`)
 	require.Contains(t, body, `"type":"tool_use"`)
 	require.Contains(t, body, `"id":"toolu_1"`)
+}
+
+func TestWriteClaudeCLIToolUseResponseIncludesUsageInStream(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	err := writeClaudeCLIToolUseResponse(
+		c,
+		&claudeCLIInput{Model: "claude-opus-4-7"},
+		&ParsedRequest{Stream: true},
+		[]claudeCLIToolCall{{ID: "toolu_1", Name: "lookup", Input: map[string]any{"q": "hello"}}},
+		nil,
+		ClaudeUsage{InputTokens: 12, OutputTokens: 4, CacheCreationInputTokens: 3, CacheReadInputTokens: 5},
+	)
+	require.NoError(t, err)
+	body := rec.Body.String()
+	require.Contains(t, body, `"input_tokens":12`)
+	require.Contains(t, body, `"cache_creation_input_tokens":3`)
+	require.Contains(t, body, `"cache_read_input_tokens":5`)
+	require.Contains(t, body, `"output_tokens":4`)
 }
 
 func TestWriteClaudeCLIToolUseResponseStripsMCPServerPrefix(t *testing.T) {
@@ -1287,6 +1311,7 @@ func TestWriteClaudeCLIToolUseResponseStripsMCPServerPrefix(t *testing.T) {
 		&ParsedRequest{Stream: false},
 		[]claudeCLIToolCall{{ID: "toolu_1", Name: "mcp__claude__Bash", Input: map[string]any{"command": "date"}}},
 		nil,
+		ClaudeUsage{},
 	)
 	require.NoError(t, err)
 
